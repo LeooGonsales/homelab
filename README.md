@@ -14,7 +14,7 @@ Servidor Linux doméstico montado num notebook antigo, onde hospedo meus própri
 | Armazenamento | HD de 500 GB (5.400 rpm) + HD externo |
 | Sistema | Linux Mint 22.3 |
 | Contêineres | Docker 29 + Docker Compose v2 |
-| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH; arquivos pelo celular via SFTP (Solid Explorer) |
+| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH ([guia de chave](docs/ssh-chave.md)); arquivos pelo celular via SFTP (Solid Explorer) |
 | Firewall | UFW |
 
 ## Serviços
@@ -29,6 +29,10 @@ Servidor Linux doméstico montado num notebook antigo, onde hospedo meus própri
 | [Netdata](https://www.netdata.cloud) | Monitoramento de CPU, memória, disco e contêineres em tempo real | Contêiner |
 
 As configurações estão em [`stacks/`](stacks/). Senhas e caminhos pessoais ficam num arquivo `.env`, que **não** é versionado (veja o `.env.example` de cada stack).
+
+## Backup
+
+As fotos e o banco de dados do Immich têm backup automático para o HD externo, e a restauração já foi testada. Script de referência: [`scripts/backup-immich.sh`](scripts/backup-immich.sh).
 
 ## Arquitetura
 
@@ -88,12 +92,4 @@ flowchart LR
 - Parâmetros do kernel no GRUB (`/etc/default/grub` + `update-grub`) e leitura de logs do kernel para diagnosticar hardware.
 - Diferença entre FTP e SFTP: o SFTP usa o próprio SSH (porta 22), sem instalar outro serviço.
 - Permissões de arquivos no Linux: um usuário comum não lê as pastas do `root`.
-
-## Próximos passos
-
-- [ ] SSH apenas com chave (desativar login por senha). Guia: [`docs/ssh-chave.md`](docs/ssh-chave.md)
-- [ ] Backup automático do Immich (banco + fotos) para o HD externo. Script: [`scripts/backup-immich.sh`](scripts/backup-immich.sh)
-- [ ] Testar a restauração do backup
-- [ ] Migrar os contêineres criados com `docker run` (Jellyfin, Netdata) para Docker Compose
-- [ ] Revisar a exposição de portas: o Docker publica portas direto no iptables e contorna as regras do UFW
-- [ ] Alertas do Netdata (disco cheio, temperatura)
+- Backup só vale depois de testar a restauração.
