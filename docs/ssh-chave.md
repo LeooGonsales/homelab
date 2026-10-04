@@ -28,6 +28,10 @@ ssh leonardo@IP_DO_TAILSCALE
 
 Se entrar **sem pedir a senha do usuário** (só a passphrase da chave, se você criou uma), funcionou.
 
+## 3.1 Antes de desativar a senha: o celular
+
+O Solid Explorer (SFTP) também entra pelo SSH. Se ele estiver configurado com senha, vai parar de conectar no passo 4. Gere uma chave para o celular (ou importe uma chave privada no app), adicione a chave pública dele no `~/.ssh/authorized_keys` do servidor e teste a conexão SFTP com chave **antes** de seguir.
+
 ## 4. No servidor: desativar login por senha
 
 ```bash

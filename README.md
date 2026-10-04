@@ -14,7 +14,7 @@ Servidor Linux doméstico montado num notebook antigo, onde hospedo meus própri
 | Armazenamento | HD de 500 GB (5.400 rpm) + HD externo |
 | Sistema | Linux Mint 22.3 |
 | Contêineres | Docker 29 + Docker Compose v2 |
-| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH |
+| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH; arquivos pelo celular via SFTP (Solid Explorer) |
 | Firewall | UFW |
 
 ## Serviços
@@ -38,7 +38,7 @@ flowchart LR
         cel[Celular]
         pc[PC com Windows]
     end
-    cel -- Tailscale --> srv
+    cel -- Tailscale / SFTP --> srv
     pc -- Tailscale / SSH --> srv
     subgraph srv[Servidor - Linux Mint]
         direction TB
@@ -54,7 +54,24 @@ flowchart LR
 
 ## Problemas que encontrei e como resolvi
 
-<!-- Escreva aqui casos REAIS no formato: sintoma, como investigou, causa, solução. -->
+### Teclado e touchpad do notebook param de responder
+- **Sintoma:** o teclado e o touchpad internos travavam de repente, às vezes já na tela de login. Dispositivos USB também falhavam em alguns momentos.
+- **Investigação:** a interface gráfica (XFCE) continuava respondendo a cliques, então o sistema não tinha travado. Para não forçar o desligamento (o que derrubaria os contêineres e apagaria os logs da memória), usei o teclado virtual **Onboard** para abrir o terminal e ler os logs do kernel. Descartei falha física e problema de vídeo/X11. Os logs apontaram para o controlador de teclado e touchpad internos (`i8042`).
+- **Causa provável:** o kernel perdia a comunicação com o controlador `i8042` por causa da forma como o firmware do notebook (ACPI/PnP) configura esse controlador, inclusive no gerenciamento de energia.
+- **Solução:** adicionei parâmetros de boot no GRUB para o kernel não depender dessa configuração e reiniciar o controlador quando necessário:
+  ```bash
+  sudo nano /etc/default/grub
+  # na linha GRUB_CMDLINE_LINUX_DEFAULT, acrescentei:
+  #   i8042.nopnp=1 i8042.reset
+  sudo update-grub
+  sudo reboot
+  ```
+
+### Arquivos do servidor pelo celular: conexão falhando e pastas vazias
+- **Sintoma:** gerenciar arquivos pelo celular era lento. Antes eu usava o FileBrowser no navegador (porta 8080), que funciona bem no PC mas é ruim no celular. Ao trocar para o app Solid Explorer, a conexão não funcionava e, quando conectava, mostrava pastas vazias.
+- **Investigação:** testei os tipos de conexão do app e as portas. Eu estava tentando FTP na porta do serviço web (8080), mas o servidor não tem FTP: o acesso a arquivos é pelo SSH.
+- **Causa:** (1) protocolo e porta errados: o certo é **SFTP**, que usa o próprio SSH na porta 22; (2) a conexão abria na raiz do sistema (`/`), em pastas do `root` que o meu usuário não pode ler, por isso aparecia tudo vazio.
+- **Solução:** configurei no Solid Explorer uma conexão **SFTP** para o IP do servidor no Tailscale, porta 22, com o caminho inicial em `/home/<meu usuário>`. Agora o HD do servidor aparece no Android como uma pasta comum, e copio e movo arquivos sem abrir nenhuma porta para a internet.
 
 ### Immich e Homarr aparecendo como `unhealthy` logo após ligar o servidor
 - **Sintoma:** depois de reiniciar o servidor, `docker ps` mostrava `immich_server`, `immich_machine_learning` e `homarr` como *unhealthy*.
@@ -62,18 +79,15 @@ flowchart LR
 - **Causa:** no Celeron com HD mecânico, os serviços demoram alguns minutos para subir, e o *healthcheck* falha enquanto isso.
 - **Resultado:** depois de cerca de 10 minutos, todos passaram para *healthy* sem intervenção.
 
-### [Seu próximo caso real]
-- **Sintoma:**
-- **Investigação:**
-- **Causa:**
-- **Solução:**
-
 ## O que aprendi
 
 - Diferença entre volumes nomeados e *bind mounts* (onde ficam de fato as fotos do Immich e o banco de dados).
 - Redes Docker: serviços do mesmo `docker-compose.yml` se encontram pelo nome (ex.: o Immich chama `immich-machine-learning:3003`).
 - *Healthchecks* e leitura de logs para diagnosticar contêineres.
 - VPN mesh com Tailscale para acessar o servidor de fora de casa sem abrir portas no roteador.
+- Parâmetros do kernel no GRUB (`/etc/default/grub` + `update-grub`) e leitura de logs do kernel para diagnosticar hardware.
+- Diferença entre FTP e SFTP: o SFTP usa o próprio SSH (porta 22), sem instalar outro serviço.
+- Permissões de arquivos no Linux: um usuário comum não lê as pastas do `root`.
 
 ## Próximos passos
 
