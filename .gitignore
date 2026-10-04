@@ -1,0 +1,10 @@
+# Segredos e dados locais: nunca versionar
+.env
+**/.env
+**/config/
+**/configs/
+**/icons/
+**/library/
+**/postgres/
+*.log
+*.sql.gz

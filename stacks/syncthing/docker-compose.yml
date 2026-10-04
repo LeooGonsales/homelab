@@ -1,0 +1,16 @@
+services:
+  syncthing:
+    image: syncthing/syncthing:latest
+    container_name: syncthing
+    hostname: servidor-leo
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./config:/var/syncthing/config
+      - ${SYNC_DIR:-/home/leonardo/meu_drive}:/var/syncthing/meu_drive
+    ports:
+      - 8384:8384       # interface web
+      - 22000:22000/tcp # transferência de dados
+      - 22000:22000/udp
+    restart: unless-stopped
