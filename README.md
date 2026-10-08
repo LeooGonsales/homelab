@@ -1,50 +1,52 @@
+**English** | [Português (BR)](README.pt-BR.md)
+
 # Homelab
 
-Servidor Linux doméstico montado num notebook antigo, onde hospedo meus próprios serviços (fotos, música, mídia e sincronização de arquivos) em contêineres Docker, com acesso remoto por VPN.
+A home Linux server built on an old laptop, where I self-host my own services (photos, music, media and file sync) in Docker containers, with remote access over a VPN.
 
-> **English summary:** a home server built from an old Samsung laptop (Intel Celeron 4205U, 11 GB RAM, 500 GB HDD) running Linux Mint 22. It self-hosts Immich, Jellyfin, Navidrome, Syncthing, Homarr and Netdata in Docker containers, with remote access through Tailscale and SSH. This repository documents the setup, the problems I ran into and what I plan to improve.
+> This repository documents the setup, the problems I ran into and how I solved them. The Portuguese version is in [README.pt-BR.md](README.pt-BR.md).
 
-## Hardware e sistema
+## Hardware and system
 
-| Item | Detalhe |
+| Item | Details |
 |---|---|
-| Máquina | Notebook Samsung reaproveitado |
-| CPU | Intel Celeron 4205U (2 núcleos, 1,8 GHz) |
-| Memória | 11 GB RAM + zram |
-| Armazenamento | HD de 500 GB (5.400 rpm) + HD externo |
-| Sistema | Linux Mint 22.3 |
-| Contêineres | Docker 29 + Docker Compose v2 |
-| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH ([guia de chave](docs/ssh-chave.md)); arquivos pelo celular via SFTP (Solid Explorer) |
+| Machine | Repurposed Samsung laptop |
+| CPU | Intel Celeron 4205U (2 cores, 1.8 GHz) |
+| Memory | 11 GB RAM + zram |
+| Storage | 500 GB HDD (5,400 rpm) + external HDD |
+| OS | Linux Mint 22.3 |
+| Containers | Docker 29 + Docker Compose v2 |
+| Remote access | Tailscale (WireGuard-based VPN) + SSH ([key guide, in Portuguese](docs/ssh-chave.md)); files from my phone via SFTP (Solid Explorer) |
 | Firewall | UFW |
 
-## Serviços
+## Services
 
-| Serviço | Para que serve | Como roda |
+| Service | What it does | How it runs |
 |---|---|---|
-| [Immich](https://immich.app) | Backup e galeria de fotos/vídeos do celular, com reconhecimento facial e busca por machine learning | Docker Compose: servidor, machine learning, PostgreSQL (com extensões vetoriais) e Valkey |
-| [Jellyfin](https://jellyfin.org) | Servidor de mídia | Contêiner na rede `servidor_network` |
-| [Navidrome](https://www.navidrome.org) | Streaming da minha biblioteca de música (compatível com apps Subsonic) | Docker Compose, pasta de música montada só para leitura |
-| [Syncthing](https://syncthing.net) | Sincronização de arquivos entre meus dispositivos, sem nuvem de terceiros | Docker Compose |
-| [Homarr](https://homarr.dev) | Painel com atalhos para todos os serviços | Docker Compose |
-| [Netdata](https://www.netdata.cloud) | Monitoramento de CPU, memória, disco e contêineres em tempo real | Contêiner |
+| [Immich](https://immich.app) | Backup and gallery for phone photos/videos, with face recognition and machine-learning search | Docker Compose: server, machine learning, PostgreSQL (with vector extensions) and Valkey |
+| [Jellyfin](https://jellyfin.org) | Media server | Container on the `servidor_network` network |
+| [Navidrome](https://www.navidrome.org) | Streaming for my music library (Subsonic-compatible apps) | Docker Compose, music folder mounted read-only |
+| [Syncthing](https://syncthing.net) | File sync between my devices, with no third-party cloud | Docker Compose |
+| [Homarr](https://homarr.dev) | Dashboard with shortcuts to all services | Docker Compose |
+| [Netdata](https://www.netdata.cloud) | Real-time monitoring of CPU, memory, disk and containers | Container |
 
-As configurações estão em [`stacks/`](stacks/). Senhas e caminhos pessoais ficam num arquivo `.env`, que **não** é versionado (veja o `.env.example` de cada stack).
+Configuration lives in [`stacks/`](stacks/). Passwords and personal paths are kept in a `.env` file that is **not** versioned (see the `.env.example` in each stack).
 
 ## Backup
 
-As fotos e o banco de dados do Immich têm backup automático para o HD externo, e a restauração já foi testada. Script de referência: [`scripts/backup-immich.sh`](scripts/backup-immich.sh).
+Immich photos and its database are backed up automatically to the external HDD, and the restore has been tested. Reference script: [`scripts/backup-immich.sh`](scripts/backup-immich.sh).
 
-## Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Dispositivos
-        cel[Celular]
-        pc[PC com Windows]
+    subgraph Devices
+        cel[Phone]
+        pc[Windows PC]
     end
     cel -- Tailscale / SFTP --> srv
     pc -- Tailscale / SSH --> srv
-    subgraph srv[Servidor - Linux Mint]
+    subgraph srv[Server - Linux Mint]
         direction TB
         immich[Immich + PostgreSQL + Valkey + ML]
         jelly[Jellyfin]
@@ -53,43 +55,43 @@ flowchart LR
         homarr[Homarr]
         net[Netdata]
     end
-    srv --- hd[(HD externo)]
+    srv --- hd[(External HDD)]
 ```
 
-## Problemas que encontrei e como resolvi
+## Problems I ran into and how I solved them
 
-### Teclado e touchpad do notebook param de responder
-- **Sintoma:** o teclado e o touchpad internos travavam de repente, às vezes já na tela de login. Dispositivos USB também falhavam em alguns momentos.
-- **Investigação:** a interface gráfica (XFCE) continuava respondendo a cliques, então o sistema não tinha travado. Para não forçar o desligamento (o que derrubaria os contêineres e apagaria os logs da memória), usei o teclado virtual **Onboard** para abrir o terminal e ler os logs do kernel. Descartei falha física e problema de vídeo/X11. Os logs apontaram para o controlador de teclado e touchpad internos (`i8042`).
-- **Causa provável:** o kernel perdia a comunicação com o controlador `i8042` por causa da forma como o firmware do notebook (ACPI/PnP) configura esse controlador, inclusive no gerenciamento de energia.
-- **Solução:** adicionei parâmetros de boot no GRUB para o kernel não depender dessa configuração e reiniciar o controlador quando necessário:
-  ```bash
-  sudo nano /etc/default/grub
-  # na linha GRUB_CMDLINE_LINUX_DEFAULT, acrescentei:
-  #   i8042.nopnp=1 i8042.reset
-  sudo update-grub
-  sudo reboot
-  ```
+### Laptop keyboard and touchpad stop responding
+- **Symptom:** the built-in keyboard and touchpad would suddenly freeze, sometimes right at the login screen. USB devices also failed at times.
+- **Investigation:** the graphical interface (XFCE) still responded to clicks, so the system had not crashed. To avoid a forced shutdown (which would bring down the containers and wipe the logs in memory), I used the **Onboard** on-screen keyboard to open a terminal and read the kernel logs. I ruled out hardware failure and video/X11 problems. The logs pointed to the built-in keyboard and touchpad controller (`i8042`).
+- **Probable cause:** the kernel was losing communication with the `i8042` controller because of how the laptop firmware (ACPI/PnP) configures it, including in power management.
+- **Fix:** I added boot parameters in GRUB so the kernel does not depend on that configuration and resets the controller when needed:
+```bash
+sudo nano /etc/default/grub
+# on the GRUB_CMDLINE_LINUX_DEFAULT line, I added:
+# i8042.nopnp=1 i8042.reset
+sudo update-grub
+sudo reboot
+```
 
-### Arquivos do servidor pelo celular: conexão falhando e pastas vazias
-- **Sintoma:** gerenciar arquivos pelo celular era lento. Antes eu usava o FileBrowser no navegador (porta 8080), que funciona bem no PC mas é ruim no celular. Ao trocar para o app Solid Explorer, a conexão não funcionava e, quando conectava, mostrava pastas vazias.
-- **Investigação:** testei os tipos de conexão do app e as portas. Eu estava tentando FTP na porta do serviço web (8080), mas o servidor não tem FTP: o acesso a arquivos é pelo SSH.
-- **Causa:** (1) protocolo e porta errados: o certo é **SFTP**, que usa o próprio SSH na porta 22; (2) a conexão abria na raiz do sistema (`/`), em pastas do `root` que o meu usuário não pode ler, por isso aparecia tudo vazio.
-- **Solução:** configurei no Solid Explorer uma conexão **SFTP** para o IP do servidor no Tailscale, porta 22, com o caminho inicial em `/home/<meu usuário>`. Agora o HD do servidor aparece no Android como uma pasta comum, e copio e movo arquivos sem abrir nenhuma porta para a internet.
+### Server files from my phone: connection failing and empty folders
+- **Symptom:** managing files from my phone was slow. I used to use FileBrowser in the browser (port 8080), which works well on a PC but is poor on a phone. After switching to the Solid Explorer app, the connection did not work and, when it did connect, it showed empty folders.
+- **Investigation:** I tested the app's connection types and ports. I was trying FTP on the web service port (8080), but the server has no FTP: file access goes through SSH.
+- **Cause:** (1) wrong protocol and port: the right one is **SFTP**, which uses SSH itself on port 22; (2) the connection opened at the system root (`/`), in `root` folders that my user cannot read, so everything looked empty.
+- **Fix:** in Solid Explorer I set up an **SFTP** connection to the server's Tailscale IP, port 22, with the starting path at `/home/<my user>`. Now the server's HDD shows up on Android like a regular folder, and I copy and move files without opening any port to the internet.
 
-### Immich e Homarr aparecendo como `unhealthy` logo após ligar o servidor
-- **Sintoma:** depois de reiniciar o servidor, `docker ps` mostrava `immich_server`, `immich_machine_learning` e `homarr` como *unhealthy*.
-- **Investigação:** olhei os logs com `docker logs --tail 25 immich_server` e esperei a inicialização terminar.
-- **Causa:** no Celeron com HD mecânico, os serviços demoram alguns minutos para subir, e o *healthcheck* falha enquanto isso.
-- **Resultado:** depois de cerca de 10 minutos, todos passaram para *healthy* sem intervenção.
+### Immich and Homarr showing as `unhealthy` right after boot
+- **Symptom:** after restarting the server, `docker ps` showed `immich_server`, `immich_machine_learning` and `homarr` as *unhealthy*.
+- **Investigation:** I checked the logs with `docker logs --tail 25 immich_server` and waited for startup to finish.
+- **Cause:** on the Celeron with a mechanical HDD, the services take a few minutes to come up, and the *healthcheck* fails in the meantime.
+- **Result:** after about 10 minutes, all of them became *healthy* without intervention.
 
-## O que aprendi
+## What I learned
 
-- Diferença entre volumes nomeados e *bind mounts* (onde ficam de fato as fotos do Immich e o banco de dados).
-- Redes Docker: serviços do mesmo `docker-compose.yml` se encontram pelo nome (ex.: o Immich chama `immich-machine-learning:3003`).
-- *Healthchecks* e leitura de logs para diagnosticar contêineres.
-- VPN mesh com Tailscale para acessar o servidor de fora de casa sem abrir portas no roteador.
-- Parâmetros do kernel no GRUB (`/etc/default/grub` + `update-grub`) e leitura de logs do kernel para diagnosticar hardware.
-- Diferença entre FTP e SFTP: o SFTP usa o próprio SSH (porta 22), sem instalar outro serviço.
-- Permissões de arquivos no Linux: um usuário comum não lê as pastas do `root`.
-- Backup só vale depois de testar a restauração.
+- The difference between named volumes and *bind mounts* (where the Immich photos and database actually live).
+- Docker networks: services in the same `docker-compose.yml` find each other by name (e.g. Immich calls `immich-machine-learning:3003`).
+- Healthchecks and reading logs to diagnose containers.
+- Mesh VPN with Tailscale to reach the server from outside the house without opening router ports.
+- Kernel parameters in GRUB (`/etc/default/grub` + `update-grub`) and reading kernel logs to diagnose hardware.
+- The difference between FTP and SFTP: SFTP uses SSH itself (port 22), with no extra service to install.
+- Linux file permissions: a regular user cannot read `root` folders.
+- A backup only counts once you have tested the restore.
