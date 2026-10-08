@@ -16,7 +16,7 @@ A home Linux server built on an old laptop, where I self-host my own services (p
 | Storage | 500 GB HDD (5,400 rpm) + external HDD |
 | OS | Linux Mint 22.3 |
 | Containers | Docker 29 + Docker Compose v2 |
-| Remote access | Tailscale (WireGuard-based VPN) + SSH ([key guide, in Portuguese](docs/ssh-chave.md)); files from my phone via SFTP (Solid Explorer) |
+| Remote access | Tailscale (WireGuard-based VPN) + SSH ([key guide](docs/ssh-chave.md)); files from my phone via SFTP (Solid Explorer) |
 | Firewall | UFW |
 
 ## Services
