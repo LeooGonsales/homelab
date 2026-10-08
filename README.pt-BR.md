@@ -16,7 +16,7 @@ Servidor Linux doméstico montado num notebook antigo, onde hospedo meus própri
 | Armazenamento | HD de 500 GB (5.400 rpm) + HD externo |
 | Sistema | Linux Mint 22.3 |
 | Contêineres | Docker 29 + Docker Compose v2 |
-| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH ([guia de chave](docs/ssh-chave.md)); arquivos pelo celular via SFTP (Solid Explorer) |
+| Acesso remoto | Tailscale (VPN sobre WireGuard) + SSH ([guia de chave](docs/ssh-chave.pt-BR.md)); arquivos pelo celular via SFTP (Solid Explorer) |
 | Firewall | UFW |
 
 ## Serviços
