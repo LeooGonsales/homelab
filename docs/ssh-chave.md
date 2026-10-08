@@ -1,41 +1,43 @@
-# SSH só com chave (sem senha)
+**English** | [Português (BR)](ssh-chave.pt-BR.md)
 
-Objetivo: entrar no servidor com uma chave criptográfica em vez de senha e depois desativar o login por senha. Isso elimina ataques de força bruta contra a senha.
+# SSH with a key only (no password)
 
-> ⚠️ Faça tudo com **uma sessão SSH já aberta** e só feche essa sessão depois de testar o login com chave em **outra** janela. Se algo der errado, a sessão aberta (ou o teclado do próprio notebook) serve para desfazer.
+Goal: log in to the server with a cryptographic key instead of a password, then disable password login. This eliminates brute-force attacks against the password.
 
-## 1. No PC com Windows (PowerShell): criar a chave
+> ⚠️ Do everything with **an SSH session already open**, and only close that session after testing the key login in **another** window. If something goes wrong, the open session (or the laptop's own keyboard) lets you undo it.
+
+## 1. On the Windows PC (PowerShell): create the key
 
 ```powershell
 ssh-keygen -t ed25519 -C "pc-leonardo"
 ```
 
-Aperte Enter para aceitar o caminho padrão (`C:\Users\SEU_USUARIO\.ssh\id_ed25519`). Uma senha para a chave (*passphrase*) é recomendada.
+Press Enter to accept the default path (`C:\Users\YOUR_USER\.ssh\id_ed25519`). A passphrase for the key is recommended.
 
-## 2. Copiar a chave pública para o servidor
+## 2. Copy the public key to the server
 
-O Windows não tem `ssh-copy-id`, então:
-
-```powershell
-type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh leonardo@IP_DO_TAILSCALE "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-```
-
-## 3. Testar (numa janela NOVA)
+Windows has no `ssh-copy-id`, so:
 
 ```powershell
-ssh leonardo@IP_DO_TAILSCALE
+type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh leonardo@TAILSCALE_IP "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 ```
 
-Se entrar **sem pedir a senha do usuário** (só a passphrase da chave, se você criou uma), funcionou.
+## 3. Test (in a NEW window)
 
-## 3.1 Antes de desativar a senha: o celular
+```powershell
+ssh leonardo@TAILSCALE_IP
+```
 
-O Solid Explorer (SFTP) também entra pelo SSH. Se ele estiver configurado com senha, vai parar de conectar no passo 4. Gere uma chave para o celular (ou importe uma chave privada no app), adicione a chave pública dele no `~/.ssh/authorized_keys` do servidor e teste a conexão SFTP com chave **antes** de seguir.
+If you get in **without being asked for the user password** (only the key passphrase, if you set one), it worked.
 
-## 4. No servidor: desativar login por senha
+## 3.1 Before disabling the password: your phone
+
+Solid Explorer (SFTP) also connects over SSH. If it is set up with a password, it will stop connecting at step 4. Generate a key for the phone (or import a private key in the app), add its public key to the server's `~/.ssh/authorized_keys`, and test the SFTP connection with the key **before** moving on.
+
+## 4. On the server: disable password login
 
 ```bash
-sudo tee /etc/ssh/sshd_config.d/10-sem-senha.conf > /dev/null <<'EOF'
+sudo tee /etc/ssh/sshd_config.d/10-no-password.conf > /dev/null <<'EOF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
@@ -43,20 +45,20 @@ EOF
 sudo sshd -t && sudo systemctl reload ssh
 ```
 
-`sshd -t` testa a configuração antes de recarregar. Se der erro, nada muda.
+`sshd -t` tests the configuration before reloading. If it reports an error, nothing changes.
 
-## 5. Confirmar
+## 5. Confirm
 
-Numa janela nova, teste de novo o login com chave. Para ver que a senha foi recusada:
+In a new window, test the key login again. To see that the password is refused:
 
 ```powershell
-ssh -o PubkeyAuthentication=no leonardo@IP_DO_TAILSCALE
+ssh -o PubkeyAuthentication=no leonardo@TAILSCALE_IP
 ```
 
-Deve responder `Permission denied (publickey)`.
+It should answer `Permission denied (publickey)`.
 
-## Como desfazer
+## How to undo
 
 ```bash
-sudo rm /etc/ssh/sshd_config.d/10-sem-senha.conf && sudo systemctl reload ssh
+sudo rm /etc/ssh/sshd_config.d/10-no-password.conf && sudo systemctl reload ssh
 ```
